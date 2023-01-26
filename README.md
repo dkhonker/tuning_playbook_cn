@@ -1,26 +1,32 @@
-# 深度学习调优手册（Deep Learning Tuning Playbook）
+# 深度学习调参手册（Deep Learning Tuning Playbook）
+
+翻译by 我，持续更新。
+
+翻译自[Deep Learning Tuning Playbook](https://github.com/google-research/tuning_playbook)。基于2023/01/20的最新版本(SHA：890cd5387477a5ea1b3a7a40fe4ad1d077f54151)。
+
+由Google Research和Harvard University研究人员联合出品。
+
+**翻译说明：**
+
+非完全直译。对于一些常用的词汇，比如epoch，step等，选择不翻译。
+
+对于一些难以翻译又不得不翻译的，选择意译的方式。
+
+---
 
 *非官方支持的Google产品*
 
 作者：**Varun Godbole<sup>&dagger;</sup>, George E. Dahl<sup>&dagger;</sup>, Justin Gilmer<sup>&dagger;</sup>, Christopher J. Shallue<sup>&Dagger;</sup>, Zachary Nado<sup>&dagger;</sup>**
 
 
-&dagger; Google Research, Brain Team
+ <sup>&dagger;</sup>Google Research, Brain Team
 
-&Dagger; Harvard University
-
-由Google Research和Harvard University研究人员联合出品。
-
----
-
-翻译by 我，未更新完。
-
----
+ <sup>&Dagger;</sup>Harvard University
 
 ## 目录
 
 -   [这个文档是为谁设计的？](#这个文档是为谁设计的？)
--   [为什么是tuning playbook?](#为什么是tuning-playbook?)
+-   [为什么要写tuning playbook?](#为什么要写tuning-playbook?)
 -   [开始新项目前的指南](#开始新项目前的指南)
     -   [选择模型架构](#选择模型架构)
     -   [选择优化器](#选择优化器)
@@ -35,9 +41,9 @@
         hyperparameter
         configuration](#Determining-whether-to-adopt-a-training-pipeline-change-or-hyperparameter-configuration)
     -   [After exploration concludes](#After-exploration-concludes)
--   [Determining the number of steps for each training run](#Determining-the-number-of-steps-for-each-training-run)
-    -   [Deciding how long to train when training is not compute-bound](#Deciding-how-long-to-train-when-training-is-not-compute-bound)
-    -   [Deciding how long to train when training is compute-bound](#Deciding-how-long-to-train-when-training-is-compute-bound)
+-   [确定每次训练的steps数](#确定每次训练的steps数)
+    -   [当训练不受计算资源限制时如何决定该训练多久](#当训练不受计算资源限制时如何决定该训练多久)
+    -   [当训练受计算资源限制时如何决定该训练多久](#当训练受计算资源限制时如何决定该训练多久)
 -   [Additional guidance for the training pipeline](#Additional-guidance-for-the-training-pipeline)
     -   [Optimizing the input pipeline](#Optimizing-the-input-pipeline)
     -   [Evaluating model performance](Evaluating-model-performance)
@@ -58,7 +64,7 @@
 
 我们假设机器学习问题是一个有监督的学习问题或类似的问题（例如自监督）。尽管如此，本文档中的一些规定也可能适用于其他类型的问题。
 
-## 为什么是tuning playbook?
+## 为什么要写tuning playbook?
 
 目前，要让深度神经网络在实践中表现得很好，需要涉及大量的辛劳和尝试。更糟糕的是，人们使用深度学习来获得良好结果的实际方法很少被记录下来。论文为了呈现一个更清晰的故事，往往掩盖了导致最终结果的过程。而研究商业问题的机器学习工程师很少有时间退一步，概括他们的过程。教科书倾向于回避实际指导，优先考虑基本原则，即使它们的作者在应用工作中有必要的经验，可以提供有用的建议。在准备创建本文档时，我们找不到任何全面的尝试来真正解释如何使用深度学习获得良好的结果。相反，我们在博客文章和社交媒体上找到了一些建议的片段，在研究论文的附录中发现了一些技巧，偶尔会有关于某个特定项目或pipeline的案例研究，还有很多困惑。深度学习专家和不太熟练的从业者使用表面上相似的方法，但是所取得的结果之间却存在着巨大的鸿沟。与此同时，这些专家欣然承认，他们所做的一些事情可能并不完全合理。随着深度学习的成熟并对世界产生更大的影响，社区需要更多的资源来涵盖有用的诀窍，包括所有对获得更好效果至关重要的实际细节。
 
@@ -80,7 +86,7 @@
 
 ### 选择模型架构
 
-***摘要:*** *当开始一个新项目时，请尝试使用已经work的模型。*
+***概要:*** *当开始一个新项目时，请尝试使用已经work的模型。*
 
 -   选择一个成熟的、广泛使用的模型架构。 这样可以更好的在后续构建自定义模型。
 -   模型架构常有很多超参数来确定模型的大小和其他细节。比如layers的数量和宽度，比如激活函数的类型。
@@ -92,7 +98,7 @@
 
 ### 选择优化器
 
-***摘要:*** *从最受欢迎的优化器开始，用于解决手头问题。*
+***概要:*** *从最受欢迎的优化器开始，用于解决手头问题。*
 
 -   在所有类型的机器学习问题和模型架构中，没有优化器是“最佳”的。 甚至比较优化器性能是困难的。
     [参考论文：《comparing the performance of optimizers is a difficult task》](https://arxiv.org/abs/1910.05446).
@@ -113,7 +119,7 @@
 
 ### 选择batchsize
 
-***摘要:*** *batch size 影响训练速度，不应用于直接调整验证集的性能。通常，理想的batch size是硬件所能达到的最大的batch size。*
+***概要:*** *batch size 影响训练速度，不应用于直接调整验证集的性能。通常，理想的batch size是硬件所能达到的最大的batch size。*
 
 -   batch size 是确定训练时间和计算资源消耗的关键因素。
 -   增加batch size的大小通常会减少训练时间。 这可能是非常有益的，因为它，例如：
@@ -135,9 +141,9 @@
 
 <br>
 
--   对于给定的模型和优化器，可用硬件通常会支持一定范围的批处理大小。限制因素通常是GPU等加速器的内存（accelerator memory）。
--   不幸的是，如果不运行或至少编译完整的训练程序，就很难计算出哪些批处理大小适合内存。
--   最简单的解决方案通常是以不同的批处理大小(例如增加2的幂)运行少量步骤的训练作业（ job），直到其中一个作业超过可用内存。
+-   对于给定的模型和优化器，可用硬件通常会支持一定范围的batch size大小。限制因素通常是GPU等加速器的内存（accelerator memory）。
+-   不幸的是，如果不运行或至少编译完整的训练程序，就很难计算出哪些batch size大小适合内存。
+-   最简单的解决方案通常是以不同的batch size大小(例如增加2的幂)运行少量步骤的训练作业（ job），直到其中一个作业超过可用内存。
 -   对于每个批次大小，我们应该训练足够长的时间，以获得*训练吞吐量（training throughput）*的可靠估计。
 
 <p align="center">training throughput = (# examples processed per second)</p>
@@ -156,7 +162,7 @@
 
 </details>
 
-#### 选择batch size来最小化训练时间
+#### 选择batchsize来最小化训练时间
 
 <details><summary><em>[点击展开]</em></summary>
 
@@ -166,48 +172,22 @@
 
 <p align="center">Training time = (time per step) x (total number of steps)</p>
 
--   We can often consider the time per step to be approximately constant for all
-    feasible batch sizes. This is true when there is no overhead from parallel
-    computations and all training bottlenecks have been diagnosed and corrected
-    (see the
-    [previous section](#determining-the-feasible-batch-sizes-and-estimating-training-throughput)
-    for how to identify training bottlenecks). In practice, there is usually at
-    least some overhead from increasing the batch size.
--   As the batch size increases, the total number of steps needed to reach a
-    fixed performance goal typically decreases (provided all relevant
-    hyperparameters are re-tuned when the batch size is changed;
-    [Shallue et al. 2018](https://arxiv.org/abs/1811.03600)).
-    -   E.g. Doubling the batch size might halve the total number of steps
-        required. This is called **perfect scaling**.
-    -   Perfect scaling holds for all batch sizes up to a critical batch size,
-        beyond which one achieves diminishing returns.
-    -   Eventually, increasing the batch size no longer reduces the number of
-        training steps (but never increases it).
--   Therefore, the batch size that minimizes training time is usually the
-    largest batch size that still provides a reduction in the number of training
-    steps required.
-    -   This batch size depends on the dataset, model, and optimizer, and it is
-        an open problem how to calculate it other than finding it experimentally
-        for every new problem. 🤖
-    -   When comparing batch sizes, beware the distinction between an example
-        budget/[epoch](https://developers.google.com/machine-learning/glossary#epoch)
-        budget (running all experiments while fixing the number of training
-        example presentations) and a step budget (running all experiments with
-        the number of training steps fixed).
-        -   Comparing batch sizes with an epoch budget only probes the perfect
-            scaling regime, even when larger batch sizes might still provide a
-            meaningful speedup by reducing the number of training steps
-            required.
-    -   Often, the largest batch size supported by the available hardware will
-        be smaller than the critical batch size. Therefore, a good rule of thumb
-        (without running any experiments) is to use the largest batch size
-        possible.
--   There is no point in using a larger batch size if it ends up increasing the
-    training time.
+-   对于可行的batch size，我们可以认为time per step是常数。这是正确的，当没有并行运算且所有的训练瓶颈都被诊断和纠正时。
+    (查看[上一节内容](#确定可行的batchsize大小和估计训练的吞吐量)来识别训练瓶颈). 在实际中，增加batch size通常会产生一些开销。
+-   随着batch size的增加，达到固定性能目标所需的总step数通常会减少(假设在batch size改变时重新调优所有相关的超参数;;[Shallue et al. 2018](https://arxiv.org/abs/1811.03600)).
+    -   例， 将batch size 大小加倍可能会使所需的step数减半。这被称为**perfect scaling**.
+    -   Perfect scaling 适用于所有的batch size，知道临界batch size。超过临界batch size后，收益逐渐减少。
+    -   最终，增加batch size的大小不再减少训练step的数量（但永远不会增加）。
+-   因此，使训练时间最小的batch size通常是最大的batch size，仍然可以减少所需的训练step数。
+    -   batch size 大小取决于数据集、模型和优化器。如何计算它是一个开放问题，除了通过实验为每个新问题找到它。🤖
+    -   在比较batch size大小时，请注意样本预算/epoch预算（在固定训练样本演示数量的同时运行所有实验（experiments））和step预算（在确定训练step数量的情况下运行所有实验）之间的区别。
+        -   将batch size的大小与epoch预算进行），即使当较大的batch size大小仍然可以通过减少所需的训练step数量来提供有意义的加速。
+    -   通常，可用硬件支持的最大batch size大小将小于临界的batch size大小。因此，一个好的经验法则（不进行任何实验）是尽可能使用最大的batch size。
+-   如果最终增加了训练时间，那么使用更大的batch size是没有意义的。
 
 </details>
 
-#### Choosing the batch size to minimize resource consumption
+#### 选择batchsize以最小化资源消耗
 
 <details><summary><em>[点击展开]</em></summary>
 
@@ -215,48 +195,22 @@
 <br>
 
 
--   There are two types of resource costs associated with increasing the batch
-    size:
-    1.  *Upfront costs*, e.g. purchasing new hardware or rewriting the training
-        pipeline to implement multi-GPU / multi-TPU training.
-    2.  *Usage costs*, e.g. billing against the team's resource budgets, billing
-        from a cloud provider, electricity / maintenance costs.
--   If there are significant upfront costs to increasing the batch size, it
-    might be better to defer increasing the batch size until the project has
-    matured and it is easier to assess the cost-benefit tradeoff. Implementing
-    multi-host parallel training programs can introduce
-    [bugs](#considerations-for-multi-host-pipelines) and
-    [subtle issues](#batch-normalization-implementation-details) so it is
-    probably better to start off with a simpler pipeline anyway. (On the other
-    hand, a large speedup in training time might be very beneficial early in the
-    process when a lot of tuning experiments are needed).
--   We refer to the total usage cost (which may include multiple different kinds
-    of costs) as the "resource consumption". We can break down the resource
-    consumption into the following components:
+-   与增大batch size 相关的资源成本有两种类型:
+    1.  *前期成本*,例如，购买新的硬件或者在训练pipeline上应用多GPU/多TPU训练方式重新运行。
+    2.  *使用成本*, 例如根据团队的资源预算计费、云服务提供商计费、电力/维护成本。
+-   如果增加batch size需要大量的前期成本，那么最好推迟增加batch size，直到项目成熟，这样更容易评估成本效益权衡。实施多主机并行训练程序可能会引入[bugs](#considerations-for-multi-host-pipelines)和[subtle issues](#batch-normalization-implementation-details)，因此最好从更简单的pipeline开始。（另一方面，当需要进行大量调参实验时，在训练过程的早期，大幅加快训练时间可能非常有益）。
+-   我们将总使用成本（可能包括多种不同的成本）称为“资源消耗（量）”。我们可以将资源消耗量分解为以下几个部分：
 
-<p align="center">Resource consumption = (resource consumption per step) x (total number of steps)</p>
+<p align="center">资源消耗量 = (每个step的资源消耗量) x (总的steps的数量)</p>
 
--   Increasing the batch size usually allows us to
-    [reduce the total number of steps](#choosing-the-batch-size-to-minimize-training-time).
-    Whether the resource consumption increases or decreases will depend on how
-    the consumption per step changes.
-    -   Increasing the batch size might *decrease* the resource consumption. For
-        example, if each step with the larger batch size can be run on the same
-        hardware as the smaller batch size (with only a small increase in time
-        per step), then any increase in the resource consumption per step might
-        be outweighed by the decrease in the number of steps.
-    -   Increasing the batch size might *not change* the resource consumption.
-        For example, if doubling the batch size halves the number of steps
-        required and doubles the number of GPUs used, the total consumption (in
-        terms of GPU-hours) will not change.
-    -   Increasing the batch size might *increase* the resource consumption. For
-        example, if increasing the batch size requires upgraded hardware, the
-        increase in consumption per step might outweigh the reduction in the
-        number of steps.
+-   增加batch size 往往允许我们[减少总的steps的数量](#选择batchsize来最小化训练时间)。资源消耗量是增加还是减少取决于每个step的消耗量如何变化。
+    -   增加batch size大小可能会减少资源消耗。例如，如果具有较大batch size大小的每个step可以在与较小batch size大小相同的硬件上运行（每个step的时间仅略有增加），则每个step的资源消耗的任何增加都可能被step数量的减少所抵消。
+    -   增加batch size大小可能不会改变资源消耗。例如，如果将batch size大小增加一倍，则所需的steps数减少一半，使用的GPU数量增加一倍时，总消耗量（以GPU时为单位）不会改变。
+    -   增加batch size大小可能会*增加*资源消耗。例如，如果增加batch size大小需要升级硬件，则每一step的消耗增加可能会超过step数的减少。
 
 </details>
 
-#### Changing the batch size requires re-tuning most hyperparameters
+#### 更改batchsize大小需要重新调整大多数超参数
 
 <details><summary><em>[点击展开]</em></summary>
 
@@ -264,18 +218,13 @@
 <br>
 
 
--   The optimal values of most hyperparameters are sensitive to the batch size.
-    Therefore, changing the batch size typically requires starting the tuning
-    process all over again.
--   The hyperparameters that interact most strongly with the batch size, and therefore are most important to tune separately for each batch size, are the optimizer hyperparameters (e.g. learning rate, momentum) and the regularization hyperparameters.
--   Keep this in mind when choosing the batch size at the start of a project. If
-    you need to switch to a different batch size later on, it might be
-    difficult, time consuming, and expensive to re-tune everything for the new
-    batch size.
+-   大多数超参数的最佳值对batch size大小敏感。因此，更改batch szie的大小通常需要重新启动调参过程。
+-   与batch size大小影响最相关的超参数是优化器超参数（例如，学习率、动量）和正则化的超参数，因此，对于每个batch size大小，对它们进行单独调整是个重要的过程。
+-   在项目开始时选择batch size大小时，请记住这一点：如果以后需要切换到不同的batch size大小，则为新的batch size重新调整所有内容可能会很困难、耗时且成本高昂。
 
 </details>
 
-#### How batch norm interacts with the batch size
+#### batch norm如何和batch size相互影响
 
 <details><summary><em>[点击展开]</em></summary>
 
@@ -283,47 +232,24 @@
 <br>
 
 
--   Batch norm is complicated and, in general, should use a different batch size
-    than the gradient computation to compute statistics. See the
-    [batch norm section](#batch-normalization-implementation-details) for a
-    detailed discussion.
+-   batch norm是复杂的，一般来说，应该使用不同于梯度计算的批次大小来计算统计数据。有关详细讨论，请参阅[batch norm部分](#batch-normalization-implementation-details)。
 
 </details>
 
 ### 选择初始配置
 
--   Before beginning hyperparameter tuning we must determine the starting point.
-    This includes specifying (1) the model configuration (e.g. number of
-    layers), (2) the optimizer hyperparameters (e.g. learning rate), and (3) the
-    number of training steps.
--   Determining this initial configuration will require some manually configured
-    training runs and trial-and-error.
--   Our guiding principle is to find a simple, relatively fast, relatively
-    low-resource-consumption configuration that obtains a "reasonable" result.
-    -   "Simple" means avoiding bells and whistles wherever possible; these can
-        always be added later. Even if bells and whistles prove helpful down the
-        road, adding them in the initial configuration risks wasting time tuning
-        unhelpful features and/or baking in unnecessary complications.
-        -   For example, start with a constant learning rate before adding fancy
-            decay schedules.
-    -   Choosing an initial configuration that is fast and consumes minimal
-        resources will make hyperparameter tuning much more efficient.
-        -   For example, start with a smaller model.
-    -   "Reasonable" performance depends on the problem, but at minimum means
-        that the trained model performs much better than random chance on the
-        validation set (although it might be bad enough to not be worth
-        deploying).
--   Choosing the number of training steps involves balancing the following
-    tension:
-    -   On the one hand, training for more steps can improve performance and
-        makes hyperparameter tuning easier (see
-        [Shallue et al. 2018](https://arxiv.org/abs/1811.03600)).
-    -   On the other hand, training for fewer steps means that each training run
-        is faster and uses fewer resources, boosting tuning efficiency by
-        reducing the time between cycles and allowing more experiments to be run
-        in parallel. Moreover, if an unnecessarily large step budget is chosen
-        initially, it might be hard to change it down the road, e.g. once the
-        learning rate schedule is tuned for that number of steps.
+-   在开始超参数调参之前，我们必须确定起始点。这包括指定（1）模型配置（例如层数）、（2）优化器超参数（例如学习率）和（3）训练step的数量。
+-   确定此初始配置将需要一些手动配置的训练运行和试错。
+-   我们的指导原则是找到一种简单、相对快速、相对低的资源消耗配置，以获得“合理”的结果。
+    -   “简单”意味着尽可能避免一些花里胡哨的东西；这些总是可以稍后添加。即使一些花里胡哨的东西在未来证明是有用的，但在初始配置中添加它们也有可能会导致浪费时间在调整无用的功能和/或导致不必要的复杂性。
+        -   例如，在添加梯度衰减学习率之前，先从恒定学习率开始。
+    -   选择一个快速且消耗最少资源的初始配置将使超参数调整更加有效。
+        -   例如，先从一个小模型开始。
+    -   “合理的”性能取决于问题本身，但至少意味着经过训练的模型在验证集上的表现比随机机会要好得多(尽管它可能坏到不值得部署)。
+-   选择训练step涉及到平衡以下的紧张关系（tension）:
+    -   一方面，训练更多的step可以提高性能，使超参数调优更容易 (见 [Shallue et al. 2018](https://arxiv.org/abs/1811.03600)).
+    -   另一方面，训练step更少意味着每次训练运行更快，使用更少的资源，通过减少周期之间的时间和允许更多的实验并行运行来提高调参效率。
+        此外，如果一开始选择了一个不必要的大步骤预算，那么在接下来的过程中可能很难改变它，例如，针对step数进行调整的学习率策略。
 
 ## A scientific approach to improving model performance
 
@@ -342,7 +268,7 @@ Our guidance below makes the following assumptions:
 
 ### The incremental tuning strategy
 
-***摘要:*** *Start with a simple configuration and incrementally make
+***概要:*** *Start with a simple configuration and incrementally make
 improvements while building up insight into the problem. Make sure that any
 improvement is based on strong evidence to avoid adding unnecessary complexity.*
 
@@ -387,7 +313,7 @@ detail.
 
 ### Exploration vs exploitation
 
-***摘要:*** *Most of the time, our primary goal is to gain insight into the
+***概要:*** *Most of the time, our primary goal is to gain insight into the
 problem.*
 
 -   Although one might think we would spend most of our time trying to maximize
@@ -419,7 +345,7 @@ problem.*
 
 ### Choosing the goal for the next round of experiments
 
-***摘要:*** *Each round of experiments should have a clear goal and be
+***概要:*** *Each round of experiments should have a clear goal and be
 sufficiently narrow in scope that the experiments can actually make progress
 towards the goal.*
 
@@ -436,7 +362,7 @@ towards the goal.*
 
 ### Designing the next round of experiments
 
-***摘要:*** *Identify which hyperparameters are scientific, nuisance, and
+***概要:*** *Identify which hyperparameters are scientific, nuisance, and
 fixed hyperparameters for the experimental goal. Create a sequence of studies to
 compare different values of the scientific hyperparameters while optimizing over
 the nuisance hyperparameters. Choose the search space of nuisance
@@ -705,7 +631,7 @@ hyperparameters to balance resource costs with scientific value.*
 
 ### Extracting insight from experimental results
 
-***摘要:*** *In addition to trying to achieve the original scientific goal of
+***概要:*** *In addition to trying to achieve the original scientific goal of
 each group of experiments, go through a checklist of additional questions and,
 if issues are discovered, revise the experiments and rerun them.*
 
@@ -815,7 +741,7 @@ if issues are discovered, revise the experiments and rerun them.*
 <br>
 
 
-***摘要:*** *Examining the training curves is an easy way to identify common
+***概要:*** *Examining the training curves is an easy way to identify common
 failure modes and can help us prioritize what actions to take next.*
 
 -   Although in many cases the primary objective of our experiments only
@@ -969,7 +895,7 @@ trained on ImageNet.">
 
 ### Determining whether to adopt a training pipeline change or hyperparameter configuration
 
-***摘要:*** *When deciding whether to make a change to our model or training
+***概要:*** *When deciding whether to make a change to our model or training
 procedure or adopt a new hyperparameter configuration going forward, we need to
 be aware of the different sources of variation in our results.*
 
@@ -1023,7 +949,7 @@ be aware of the different sources of variation in our results.*
 
 ### After exploration concludes
 
-***摘要:*** *Bayesian optimization tools are a compelling option once we’re
+***概要:*** *Bayesian optimization tools are a compelling option once we’re
 done exploring for good search spaces and have decided what hyperparameters even
 should be tuned at all.*
 
@@ -1055,86 +981,40 @@ should be tuned at all.*
         launches with this specific workload (e.g. a one-time Kaggle
         competition).
 
-## Determining the number of steps for each training run
+## 确定每次训练的steps数
 
--   There are two types of workloads: those that are compute-bound and those
-    that are not.
--   When training is **compute-bound**, training is limited by how long we are
-    willing to wait and not by how much training data we have or some other
-    factor.
-    -   In this case, if we can somehow train longer or more efficiently, we
-        should see a lower training loss and, with proper tuning, an improved
-        validation loss.
-    -   In other words, *speeding up* training is equivalent to *improving*
-        training and the "optimal" training time is always "as long as we can
-        afford."
-    -   That said, just because a workload is compute-limited doesn't mean
-        training longer/faster is the only way to improve results.
--   When training is **not compute-bound**, we can afford to train as long as we
-    would like to, and, at some point, training longer doesn't help much (or
-    even causes problematic overfitting).
-    -   In this case, we should expect to be able to train to very low training
-        loss, to the point where training longer might slightly reduce the
-        training loss, but will not meaningfully reduce the validation loss.
-    -   Particularly when training is not compute-bound, a more generous
-        training time budget can make tuning easier, especially when tuning
-        learning rate decay schedules, since they have a particularly strong
-        interaction with the training budget.
-        -   In other words, very stingy training time budgets might require a
-            learning rate decay schedule tuned to perfection in order to achieve
-            a good error rate.
--   Regardless of whether a given workload is compute-bound or not, methods that
-    increase the variance of the gradients (across batches) will usually result
-    in slower training progress, and thus may increase the number of training
-    steps required to reach a particular validation loss. High gradient variance
-    can be caused by:
+-   有两种类型的工作负载：受计算资源限制（compute-bound）的工作负载和不受计算资源约束的工作负载。
+-   When training is **compute-bound**, training is limited by how long we are willing to wait and not by how much training data we have or some other factor.
+    -   In this case, if we can somehow train longer or more efficiently, we should see a lower training loss and, with proper tuning, an improved validation loss.
+    -   In other words, *speeding up* training is equivalent to *improving* training and the "optimal" training time is always "as long as we can afford."
+    -   That said, just because a workload is compute-limited doesn't mean training longer/faster is the only way to improve results.
+-   When training is **not compute-bound**, we can afford to train as long as we would like to, and, at some point, training longer doesn't help much (or even causes problematic overfitting).
+    -   In this case, we should expect to be able to train to very low training loss, to the point where training longer might slightly reduce the training loss, but will not meaningfully reduce the validation loss.
+    -   Particularly when training is not compute-bound, a more generous training time budget can make tuning easier, especially when tuning learning rate decay schedules, since they have a particularly strong interaction with the training budget.
+        -   In other words, very stingy training time budgets might require a learning rate decay schedule tuned to perfection in order to achieve a good error rate.
+-   Regardless of whether a given workload is compute-bound or not, methods that increase the variance of the gradients (across batches) will usually result in slower training progress, and thus may increase the number of training steps required to reach a particular validation loss. High gradient variance can be caused by:
     -   Using a smaller batch size
     -   Adding data augmentation
     -   Adding some types of regularization (e.g. dropout)
 
-### Deciding how long to train when training is *not* compute-bound
+### 当训练不受计算资源限制时如何决定该训练多久
 
--   Our main goal is to ensure we are training long enough for the model to
-    reach the best possible result, while avoiding being overly wasteful in the
-    number of training steps.
--   When in doubt, err on the side of training longer. Performance should never
-    degrade when training longer, assuming retrospective (optimal) checkpoint
-    selection is used properly and checkpoints are frequent enough.
--   Never tune the `max_train_steps` number in a study. Pick a value and use it
-    for all trials. From these trials, plot the training step that retrospective
-    checkpoint selection finds in order to refine the choice of
-    `max_train_steps`.
-    -   For example, if the best step is always during the first 10% of
-        training, then the maximum number of steps is way too high.
-    -   Alternatively, if the best step is consistently in the last 25% of
-        training we might benefit from training longer and re-tuning the decay
-        schedule.
--   The ideal number of training steps can change when the architecture or data
-    changes (e.g. adding data augmentation).
--   Below we describe how to pick an initial candidate value for
-    `max_train_steps` based on the number of steps necessary to "perfectly fit"
-    the training set using a constant learning rate.
-    -   Note, we are not using the phrase "perfectly fit the training set" in a
-        precise or mathematically well-defined way. It is merely meant as an
-        informal descriptor to indicate a very low training loss.
-        -   For example, when training with the log loss, absent regularization
-            terms, we might see the training loss keep slowly improving until we
-            reach floating point limits as the network weights grow without
-            bound and the predictions of the model on the training set become
-            increasingly confident. In this case, we might say the model
-            "perfectly fit" the training set around the time the
-            misclassification error reached zero on the training set.
-    -   The starting value for `max_train_steps` we find may need to be
-        increased if the amount of gradient noise in the training procedure
-        increases.
-        -   For example, if data augmentation or regularizers like dropout are
-            introduced to the model.
-    -   It may be possible to decrease `max_train_steps` if the training process
-        improves somehow.
-        -   For example, with a better tuned optimizer or a better tuned
-            learning rate schedule.
+-   我们的主要目标是确保我们训练的时间足够长，以使模型达到最佳效果，同时避免在训练step的数量上过度浪费。
+-   有疑问的时候，宁可多训练一点。当训练时间较长时，应确保性能不下降。回顾性(可选)的checkpoin应被正确选择，checkpoint足够频繁。
+-   永远不要在研究中调整 `max_train_steps` 。选择一个值并将其用于所有试验。从这些试验中，绘制回顾检查点选择发现的训练steps，以优化`max_train_steps`的选择。
+    -   例如，如果最佳step总是出现在训练过程的前10%达到，那么最大训练step数就太高了。
+    -   或者，如果最好的step总是出现在训练过程的最后的25%中，我们可能可以在增加训练时间和重新调整学习率衰减策略中受益。
+-   当模型架构或数据发生变化时(例如添加数据增强)，理想的训练的step数也会发生变化。
+-   下面我们将描述如何根据使用恒定学习率“完全拟合”训练集所需的step数，为`max_train_steps`选择初始候选值。
+    -   注意，我们并没有以精确或数学定义良好的方式使用短语“完美拟合训练集”。
+        它只是一个非正式的描述语，表示非常低的训练损失。
+        -   例如，当训练损失为log loss。没有正则化项时，我们可能会看到训练损失会一直在缓慢减小，直到达到浮点极限（floating point limits），因为网络权值无约束地增长，并且模型在训练集上的预测变得越来越有"自信“。在这种情况下，我们可能会说，当训练集中的错误分类为0是，模型“完全拟合”训练集。
+    -   如果训练过程中梯度噪声（gradient noise ）的数量增加，我们发现`max_train_steps`的起始值可能需要增加。
+        -   例如，如果在模型中引入数据增强或dropout等正则化方法。
+    -   如果训练过程以某种方式改进，可能会减少`max_train_steps`。
+        -   例如，使用更好的优化器或更好的学习率更新策略。
 
-#### Algorithm for picking an initial candidate for max_train_steps using a learning rate sweep
+#### 使用学习率扫描来为max_train_steps选择初始候选值的算法
 
 <details><summary><em>[点击展开]</em></summary>
 
@@ -1162,7 +1042,7 @@ should be tuned at all.*
 
 </details>
 
-### Deciding how long to train when training is compute-bound
+### 当训练受计算资源限制时如何决定该训练多久
 
 -   In some cases, training loss keeps improving indefinitely and our patience
     and computational resources become the limiting factors.
@@ -1255,45 +1135,26 @@ should be tuned at all.*
 <br>
 
 -   Run the best hyperparameter configuration from Round 1.
--   **(Speculation)** 🤖 Use the extra steps to extend the period of training at
-    a high learning rate.
-    -   E.g. if linear schedule then keep the length of the decay fixed from
-        Round 1 and extend the period of constant lr in the beginning.
-    -   For cosine decay, just keep the base lr from Round 1 and extend
-        `max_train_steps` as in
-        [Chinchilla paper](https://arxiv.org/abs/2203.15556).
--   More rounds might make sense for teams with very mature modeling and tuning
-    pipelines and very long and expensive production training runs, but they
-    will often be overkill.
-    -   We've described how to transfer from Step 1 &rarr; Step 2. If we didn't care
-        about analysis time and if making efficient use of compute was the
-        overriding concern, then the ideal would be to exponentially increase
-        the length of training runs (and thus the end-to-end time to complete a
-        study) over many different rounds of tuning.
-        -   At each round we systematically ensure our choices continue to hold
-            up.
-        -   New ideas go through a pipeline that progressively derisks them
-            using increasingly long-running experiments from Step i to Step i+1.
+-   **(Speculation)** 🤖 Use the extra steps to extend the period of training at a high learning rate.
+    -   E.g. if linear schedule then keep the length of the decay fixed from Round 1 and extend the period of constant lr in the beginning.
+    -   For cosine decay, just keep the base lr from Round 1 and extend `max_train_steps` as in [Chinchilla paper](https://arxiv.org/abs/2203.15556).
+-   More rounds might make sense for teams with very mature modeling and tuning pipelines and very long and expensive production training runs, but they will often be overkill.
+    -   We've described how to transfer from Step 1 &rarr; Step 2. If we didn't care about analysis time and if making efficient use of compute was the overriding concern, then the ideal would be to exponentially increase the length of training runs (and thus the end-to-end time to complete a study) over many different rounds of tuning.
+        -   At each round we systematically ensure our choices continue to hold up.
+        -   New ideas go through a pipeline that progressively derisks them using increasingly long-running experiments from Step i to Step i+1.
 
 </details>
 
-## Additional guidance for the training pipeline
+## training pipeline的额外指导
 
 ### Optimizing the input pipeline
 
-***摘要:*** *The causes and interventions of input-bound pipelines are highly
-task-dependent; use a profiler and look out for common issues.*
+***概要:*** *The causes and interventions of input-bound pipelines are highly task-dependent; use a profiler and look out for common issues.*
 
--   Use an appropriate profiler to diagnose input-bound pipelines. For example,
-    [Perfetto](https://jax.readthedocs.io/en/latest/profiling.html) for JAX or
-    [TensorFlow profiler](https://www.tensorflow.org/guide/profiler) for
-    TensorFlow.
--   Ultimately, the specific causes and interventions will be highly
-    task-dependent. Broader engineering considerations (e.g. minimizing disk
-    footprint) may warrant worse input pipeline performance.
+-   Use an appropriate profiler to diagnose input-bound pipelines. For example,[Perfetto](https://jax.readthedocs.io/en/latest/profiling.html) for JAX or [TensorFlow profiler](https://www.tensorflow.org/guide/profiler) for TensorFlow.
+-   Ultimately, the specific causes and interventions will be highly task-dependent. Broader engineering considerations (e.g. minimizing disk footprint) may warrant worse input pipeline performance.
 -   Common causes:
-    -   Data are not colocated with the training process, causing I/O latency
-        (this might happen when reading training data over a network).
+    -   Data are not colocated with the training process, causing I/O latency (this might happen when reading training data over a network).
     -   Expensive online data preprocessing (consider doing this once offline
         and saving).
     -   Unintentional synchronization barriers that interfere with data pipeline
@@ -1301,18 +1162,14 @@ task-dependent; use a profiler and look out for common issues.*
         and host in CommonLoopUtils
         ([link](https://github.com/google/CommonLoopUtils/blob/fea2518ada8814a78e1492023fd9f00edb0b0568/clu/metrics.py#L291)).
 -   Common tips:
-    -   Instrument input pipeline to prefetch examples (e.g.
-        [tf.data.Dataset.prefetch](https://www.tensorflow.org/guide/data_performance#prefetching))
-    -   Remove unused features/metadata from each as early in the pipeline as
-        possible.
-    -   Increase the replication of the number of jobs generating examples for
-        the input pipeline. For example, by using the
+    -   Instrument input pipeline to prefetch examples (e.g.[tf.data.Dataset.prefetch](https://www.tensorflow.org/guide/data_performance#prefetching))
+    -   Remove unused features/metadata from each as early in the pipeline as possible.
+    -   Increase the replication of the number of jobs generating examples for the input pipeline. For example, by using the
         [tf.data service](https://www.tensorflow.org/api_docs/python/tf/data/experimental/service).
 
 ### Evaluating model performance
 
-***摘要:*** *Run evaluation at larger batch sizes than training. Run
-evaluations at regular step intervals, not regular time intervals.*
+***概要:*** *Run evaluation at larger batch sizes than training. Run evaluations at regular step intervals, not regular time intervals.*
 
 #### Evaluation settings
 
@@ -1422,7 +1279,7 @@ evaluations at regular step intervals, not regular time intervals.*
 
 ### Saving checkpoints and retrospectively selecting the best checkpoint
 
-***摘要:*** *Run training for a fixed number of steps and retrospectively
+***概要:*** *Run training for a fixed number of steps and retrospectively
 choose the best checkpoint from the run.*
 
 -   Most deep learning frameworks support
@@ -1433,17 +1290,14 @@ choose the best checkpoint from the run.*
 -   The best checkpoint is often not the last checkpoint, particularly when the
     validation set performance does not continue to increase over time but
     rather fluctuates about a particular value.
--   Set up the pipeline to keep track of the N best checkpoints seen so far
-    during training. At the end of training, model selection is then a matter of
-    choosing the best checkpoint seen during training. We call this
-    **retrospective optimal checkpoint selection**.
+-   Set up the pipeline to keep track of the N best checkpoints seen so far during training. At the end of training, model selection is then a matter of choosing the best checkpoint seen during training. We call this **retrospective optimal checkpoint selection**.
 -   Supporting prospective early stopping is usually not necessary, since we’re
     pre-specifying a trial budget and are preserving the N best checkpoints seen
     so far.
 
 ### Setting up experiment tracking
 
-***摘要:*** *When tracking different experiments, make sure to note a number
+***概要:*** *When tracking different experiments, make sure to note a number
 of essentials like the best performance of a checkpoint in the study, and a
 short description of the study.*
 
@@ -1463,7 +1317,7 @@ short description of the study.*
 
 ### Batch normalization implementation details
 
-***摘要:*** *Nowadays batch norm can often be replaced with LayerNorm, but in
+***概要:*** *Nowadays batch norm can often be replaced with LayerNorm, but in
 cases where it cannot, there are tricky details when changing the batch size or
 number of hosts.*
 
@@ -1487,7 +1341,7 @@ number of hosts.*
 
 ### Considerations for multi-host pipelines
 
-***摘要:*** *for logging, evals, RNGs, checkpointing, and data sharding,
+***概要:*** *for logging, evals, RNGs, checkpointing, and data sharding,
 multi-host training can make it very easy to introduce bugs!*
 
 -   Ensure the pipeline is only logging and checkpointing on one host.
@@ -1727,7 +1581,7 @@ Box plots of the best performances for each trial budget are plotted above.
 
 
 
-***摘要:*** *If the model is experiencing optimization difficulties, it’s
+***概要:*** *If the model is experiencing optimization difficulties, it’s
 important to fix them before trying other things. Diagnosing and correcting
 training failures is an active area of research.*
 
