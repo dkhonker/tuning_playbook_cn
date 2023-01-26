@@ -26,7 +26,7 @@
 ## 目录
 
 -   [这个文档是为谁设计的？](#这个文档是为谁设计的？)
--   [为什么要写tuning playbook?](#为什么要写tuning-playbook?)
+-   [为什么要写这个调参指南?](#为什么要写这个调参指南?)
 -   [开始新项目前的指南](#开始新项目前的指南)
     -   [选择模型架构](#选择模型架构)
     -   [选择优化器](#选择优化器)
@@ -42,8 +42,8 @@
         configuration](#Determining-whether-to-adopt-a-training-pipeline-change-or-hyperparameter-configuration)
     -   [After exploration concludes](#After-exploration-concludes)
 -   [确定每次训练的steps数](#确定每次训练的steps数)
-    -   [当训练不受计算资源限制时如何决定该训练多久](#当训练不受计算资源限制时如何决定该训练多久)
-    -   [当训练受计算资源限制时如何决定该训练多久](#当训练受计算资源限制时如何决定该训练多久)
+    -   [当训练不受计算限制时如何决定该训练多久](#当训练不受计算限制时如何决定该训练多久)
+    -   [当训练受计算限制时如何决定该训练多久](#当训练受计算限制时如何决定该训练多久)
 -   [Additional guidance for the training pipeline](#Additional-guidance-for-the-training-pipeline)
     -   [Optimizing the input pipeline](#Optimizing-the-input-pipeline)
     -   [Evaluating model performance](Evaluating-model-performance)
@@ -64,7 +64,7 @@
 
 我们假设机器学习问题是一个有监督的学习问题或类似的问题（例如自监督）。尽管如此，本文档中的一些规定也可能适用于其他类型的问题。
 
-## 为什么要写tuning playbook?
+## 为什么要写这个调参指南?
 
 目前，要让深度神经网络在实践中表现得很好，需要涉及大量的辛劳和尝试。更糟糕的是，人们使用深度学习来获得良好结果的实际方法很少被记录下来。论文为了呈现一个更清晰的故事，往往掩盖了导致最终结果的过程。而研究商业问题的机器学习工程师很少有时间退一步，概括他们的过程。教科书倾向于回避实际指导，优先考虑基本原则，即使它们的作者在应用工作中有必要的经验，可以提供有用的建议。在准备创建本文档时，我们找不到任何全面的尝试来真正解释如何使用深度学习获得良好的结果。相反，我们在博客文章和社交媒体上找到了一些建议的片段，在研究论文的附录中发现了一些技巧，偶尔会有关于某个特定项目或pipeline的案例研究，还有很多困惑。深度学习专家和不太熟练的从业者使用表面上相似的方法，但是所取得的结果之间却存在着巨大的鸿沟。与此同时，这些专家欣然承认，他们所做的一些事情可能并不完全合理。随着深度学习的成熟并对世界产生更大的影响，社区需要更多的资源来涵盖有用的诀窍，包括所有对获得更好效果至关重要的实际细节。
 
@@ -983,8 +983,8 @@ should be tuned at all.*
 
 ## 确定每次训练的steps数
 
--   有两种类型的工作负载：受计算资源限制（compute-bound）的工作负载和不受计算资源约束的工作负载。
--   When training is **compute-bound**, training is limited by how long we are willing to wait and not by how much training data we have or some other factor.
+-   有两种类型的工作负载：受计算限制（compute-bound）的工作负载和不受计算约束的工作负载。
+-   训练时**计算受限**是指训练过程是受限于我们愿意等待的时间，而不是受限于我能有多少训练数据或其他因素。
     -   In this case, if we can somehow train longer or more efficiently, we should see a lower training loss and, with proper tuning, an improved validation loss.
     -   In other words, *speeding up* training is equivalent to *improving* training and the "optimal" training time is always "as long as we can afford."
     -   That said, just because a workload is compute-limited doesn't mean training longer/faster is the only way to improve results.
@@ -997,7 +997,7 @@ should be tuned at all.*
     -   Adding data augmentation
     -   Adding some types of regularization (e.g. dropout)
 
-### 当训练不受计算资源限制时如何决定该训练多久
+### 当训练不受计算限制时如何决定该训练多久
 
 -   我们的主要目标是确保我们训练的时间足够长，以使模型达到最佳效果，同时避免在训练step的数量上过度浪费。
 -   有疑问的时候，宁可多训练一点。当训练时间较长时，应确保性能不下降。回顾性(可选)的checkpoin应被正确选择，checkpoint足够频繁。
@@ -1042,7 +1042,7 @@ should be tuned at all.*
 
 </details>
 
-### 当训练受计算资源限制时如何决定该训练多久
+### 当训练受计算限制时如何决定该训练多久
 
 -   In some cases, training loss keeps improving indefinitely and our patience
     and computational resources become the limiting factors.
