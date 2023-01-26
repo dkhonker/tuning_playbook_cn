@@ -1,24 +1,32 @@
-# Deep Learning Tuning Playbook
+# 深度学习调优手册（Deep Learning Tuning Playbook）
 
-*This is not an officially supported Google product.*
+*非官方支持的Google产品*
 
-**Varun Godbole<sup>&dagger;</sup>, George E. Dahl<sup>&dagger;</sup>, Justin Gilmer<sup>&dagger;</sup>, Christopher J. Shallue<sup>&Dagger;</sup>, Zachary Nado<sup>&dagger;</sup>**
+作者：**Varun Godbole<sup>&dagger;</sup>, George E. Dahl<sup>&dagger;</sup>, Justin Gilmer<sup>&dagger;</sup>, Christopher J. Shallue<sup>&Dagger;</sup>, Zachary Nado<sup>&dagger;</sup>**
 
 
 &dagger; Google Research, Brain Team
 
 &Dagger; Harvard University
 
-## Table of Contents
+由Google Research和Harvard University研究人员联合出品。
 
--   [Who is this document for?](#who-is-this-document-for)
--   [Why a tuning playbook?](#why-a-tuning-playbook)
--   [Guide for starting a new project](#guide-for-starting-a-new-project)
-    -   [Choosing the model architecture](#choosing-a-model-architecture)
-    -   [Choosing the optimizer](#choosing-the-optimizer)
-    -   [Choosing the batch size](#choosing-the-batch-size)
-    -   [Choosing the initial configuration](#choosing-the-initial-configuration)
--   [A scientific approach to improving model performance](#a-scientific-approach-to-improving-model-performance)
+---
+
+翻译by 我，未更新完。
+
+---
+
+## 目录
+
+-   [这个文档是为谁设计的？](#这个文档是为谁设计的？)
+-   [为什么是tuning playbook?](#为什么是tuning-playbook?)
+-   [开始新项目前的指南](#开始新项目前的指南)
+    -   [选择模型架构](#选择模型架构)
+    -   [选择优化器](#选择优化器)
+    -   [选择batchsize](#选择batchsize)
+    -   [选择初始配置](#选择初始配置)
+-   [提升模型性能的科学方法](#提升模型性能的科学方法)
     -   [The incremental tuning strategy](#the-incremental-tuning-strategy)
     -   [Exploration vs exploitation](#exploration-vs-exploitation)
     -   [Choosing the goal for the next round of experiments](#choosing-the-goal-for-the-next-round-of-experiments)
@@ -37,229 +45,121 @@
     -   [Setting up experiment tracking](#Setting-up-experiment-tracking)
     -   [Batch normalization implementation details](#Batch-normalization-implementation-details)
     -   [Considerations for multi-host pipelines](#Considerations-for-multi-host-pipelines)
--   [FAQs](#faqs)
--   [Acknowledgments](#acknowledgments)
--   [Citing](#citing)
--   [Contributing](#contributing)
+-   [常见问题解答](#常见问题解答)
+-   [致谢](#致谢)
+-   [引用](#引用)
+-   [贡献](#contributing)
 
-## Who is this document for?
+## 这个文档是为谁设计的？
 
-This document is for engineers and researchers (both individuals and teams)
-interested in **maximizing the performance of deep learning models**. We assume
-basic knowledge of machine learning and deep learning concepts.
+本文档面向对深度学习**模型性能最优化**感兴趣的工程师和研究人员（个人和团队）。我们假设你已经掌握了机器学习和深度学习概念的基本知识。
 
-Our emphasis is on the **process of hyperparameter tuning**. We touch on other
-aspects of deep learning training, such as pipeline implementation and
-optimization, but our treatment of those aspects is not intended to be complete.
+我们的重点是超参数调参过程。我们触及了深度学习培训的其他方面，例如pipeline应用和优化，但是我们对这些方面的处理并不完整。
 
-We assume the machine learning problem is a supervised learning problem or
-something that looks a lot like one (e.g. self-supervised). That said, some of
-the prescriptions in this document may also apply to other types of problems.
+我们假设机器学习问题是一个有监督的学习问题或类似的问题（例如自监督）。尽管如此，本文档中的一些规定也可能适用于其他类型的问题。
 
-## Why a tuning playbook?
+## 为什么是tuning playbook?
 
-Currently, there is an astonishing amount of toil and guesswork involved in
-actually getting deep neural networks to work well in practice. Even worse, the
-actual recipes people use to get good results with deep learning are rarely
-documented. Papers gloss over the process that led to their final results in
-order to present a cleaner story, and machine learning engineers working on
-commercial problems rarely have time to take a step back and generalize their
-process. Textbooks tend to eschew practical guidance and prioritize fundamental
-principles, even if their authors have the necessary experience in applied work
-to provide useful advice. When preparing to create this document, we couldn't
-find any comprehensive attempt to actually explain *how to get good results with
-deep learning*. Instead, we found snippets of advice in blog posts and on social
-media, tricks peeking out of the appendix of research papers, occasional case
-studies about one particular project or pipeline, and a lot of confusion. There
-is a vast gulf between the results achieved by deep learning experts and less
-skilled practitioners using superficially similar methods. At the same time,
-these very experts readily admit some of what they do might not be
-well-justified. As deep learning matures and has a larger impact on the world,
-the community needs more resources covering useful recipes, including all the
-practical details that can be so critical for obtaining good results.
+目前，要让深度神经网络在实践中表现得很好，需要涉及大量的辛劳和尝试。更糟糕的是，人们使用深度学习来获得良好结果的实际方法很少被记录下来。论文为了呈现一个更清晰的故事，往往掩盖了导致最终结果的过程。而研究商业问题的机器学习工程师很少有时间退一步，概括他们的过程。教科书倾向于回避实际指导，优先考虑基本原则，即使它们的作者在应用工作中有必要的经验，可以提供有用的建议。在准备创建本文档时，我们找不到任何全面的尝试来真正解释如何使用深度学习获得良好的结果。相反，我们在博客文章和社交媒体上找到了一些建议的片段，在研究论文的附录中发现了一些技巧，偶尔会有关于某个特定项目或pipeline的案例研究，还有很多困惑。深度学习专家和不太熟练的从业者使用表面上相似的方法，但是所取得的结果之间却存在着巨大的鸿沟。与此同时，这些专家欣然承认，他们所做的一些事情可能并不完全合理。随着深度学习的成熟并对世界产生更大的影响，社区需要更多的资源来涵盖有用的诀窍，包括所有对获得更好效果至关重要的实际细节。
 
-We are a team of five researchers and engineers who have worked in deep learning
-for many years, some of us since as early as 2006. We have applied deep learning
-to problems in everything from speech recognition to astronomy, and learned a
-lot along the way. This document grew out of our own experience training neural
-networks, teaching new machine learning engineers, and advising our colleagues
-on the practice of deep learning. Although it has been gratifying to see deep
-learning go from a machine learning approach practiced by a handful of academic
-labs to a technology powering products used by billions of people, deep learning
-is still in its infancy as an engineering discipline and we hope this document
-encourages others to help systematize the field's experimental protocols.
+我们是一个由五名研究人员和工程师组成的团队，他们在深度学习领域工作了多年，其中一些人早在2006年就开始了。我们已经将深度学习应用于从语音识别到天文学的很多问题，并在此过程中学到了很多东西。这份文档源于我们自己训练神经网络的经验，教授新的机器学习工程师，并就深度学习的实践为我们的同事提供建议。尽管看到深度学习从少数学术实验室实践的机器学习方法发展为数十亿人使用的产品技术是令人欣慰的，但深度学习作为一门工程学科仍处于起步阶段，我们希望这份文件鼓励其他人帮助系统化该领域的实验规程。
 
-This document came about as we tried to crystalize our own approach to deep
-learning and thus it represents the opinions of the authors at the time of
-writing, not any sort of objective truth. Our own struggles with hyperparameter
-tuning made it a particular focus of our guidance, but we also cover other
-important issues we have encountered in our work (or seen go wrong). Our
-intention is for this work to be a living document that grows and evolves as our
-beliefs change. For example, the material on debugging and mitigating training
-failures would not have been possible for us to write two years ago since it is
-based on recent results and ongoing investigations. Inevitably, some of our
-advice will need to be updated to account for new results and improved
-workflows. We do not know the *optimal* deep learning recipe, but until the
-community starts writing down and debating different procedures, we cannot hope
-to find it. To that end, we would encourage readers who find issues with our
-advice to produce alternative recommendations, along with convincing evidence,
-so we can update the playbook. We would also love to see alternative guides and
-playbooks that might have different recommendations so we can work towards best
-practices as a community. Finally, any sections marked with a 🤖 emoji are places
-we would like to do more research. Only after trying to write this playbook did
-it become completely clear how many interesting and neglected research questions
-can be found in the deep learning practitioner's workflow.
+这份文档的出现是为了明确我们自己的深度学习方法，因此它代表了作者在写作时的观点，而不是任何形式的客观事实。我们自己在超参数调优方面的挣扎使它成为我们指南的一个特别重点，但我们也涵盖了我们在工作中遇到的其他重要问题(或看到的错误)。我们的意图是让这项工作成为一份活的文件，随着我们观念的改变而成长和发展。例如，关于debug和减少训练错误的材料在两年前是不可能写出来的，因为它是基于最近的结果和正在进行的调查。不可避免地，我们的一些建议需要不断更新，以说明新的结果和改进的工作流程。我们不知道最佳的深度学习配方，但在社区开始写下并讨论不同的过程之前，我们无法指望找到它。为此，我们鼓励那些对我们的建议有异议的读者提出替代建议，并提供令人信服的证据，这样我们就可以更新诀窍。我们也很乐意看到可能有不同建议的替代指南和诀窍，这样我们就可以作为一个社区，共同努力，从而实现最佳的实践。最后，任何标有🤖表情符号的区域都是我们想做更多研究的地方。
 
-## Guide for starting a new project
+只有在尝试写完这本playbook之后，我才完全清楚在深度学习从业者的工作流程中可以找到多少有趣而被忽视的研究问题。
 
-Many of the decisions we make over the course of tuning can be made once at the
-beginning of a project and only occasionally revisited when circumstances
-change.
+## 开始新项目前的指南
 
-Our guidance below makes the following assumptions:
+我们在调参过程中做出的许多决定可以在项目开始时做，只有在情况发生变化时偶尔会重新审视。
 
--   Enough of the essential work of problem formulation, data cleaning, etc. has
-    already been done that spending time on the model architecture and training
-    configuration makes sense.
--   There is already a pipeline set up that does training and evaluation, and it
-    is easy to execute training and prediction jobs for various models of
-    interest.
--   The appropriate metrics have been selected and implemented. These should be
-    as representative as possible of what would be measured in the deployed
-    environment.
+我们的指南提出了以下假设:
 
-### Choosing the model architecture
+-   已经完成了足够的问题制定（problem formulation），数据清洁等的基本工作，以使在模型架构和训练配置上花费时间是有意义的。
+-   已经有了一个pipeline,可以进行训练和评估。并容易为各种感兴趣的模型进行训练和预测。
+-   选定并应用了合适的metrics。这些应该尽可能地代表将在部署环境中测量的内容。
 
-***Summary:*** *When starting a new project, try to reuse a model that already
-works.*
+### 选择模型架构
 
--   Choose a well established, commonly used model architecture to get working
-    first. It is always possible to build a custom model later.
--   Model architectures typically have various hyperparameters that determine
-    the model's size and other details (e.g. number of layers, layer width, type
-    of activation function).
-    -   Thus, choosing the architecture really means choosing a family of
-        different models (one for each setting of the model hyperparameters).
-    -   We will consider the problem of choosing the model hyperparameters in
-        [Choosing the initial configuration](#choosing-the-initial-configuration)
-        and
-        [A scientific approach to improving model performance](#a-scientific-approach-to-improving-model-performance).
--   When possible, try to find a paper that tackles something as close as
-    possible to the problem at hand and reproduce that model as a starting
-    point.
+***摘要:*** *当开始一个新项目时，请尝试使用已经work的模型。*
 
-### Choosing the optimizer
+-   选择一个成熟的、广泛使用的模型架构。 这样可以更好的在后续构建自定义模型。
+-   模型架构常有很多超参数来确定模型的大小和其他细节。比如layers的数量和宽度，比如激活函数的类型。
 
-***Summary:*** *Start with the most popular optimizer for the type of problem at
-hand.*
+    -   因此，选择模型架构实际上代表着选择一类模型，模型大家族内不同的模型代表着不同的一组超参数。
+    -   我们将在[选择初始配置](#选择初始配置)和[提升模型性能的科学方法](#提升模型性能的科学方法)两章考虑模型超参数选择的问题。
 
--   No optimizer is the "best" across all types of machine learning problems and
-    model architectures. Even just
-    [comparing the performance of optimizers is a difficult task](https://arxiv.org/abs/1910.05446).
+-   如果可能，尝试找到一篇 解决了与手头问题尽可能相近的问题 的论文，并把复现论文中的模型作为起点。
+
+### 选择优化器
+
+***摘要:*** *从最受欢迎的优化器开始，用于解决手头问题。*
+
+-   在所有类型的机器学习问题和模型架构中，没有优化器是“最佳”的。 甚至比较优化器性能是困难的。
+    [参考论文：《comparing the performance of optimizers is a difficult task》](https://arxiv.org/abs/1910.05446).
     🤖
--   We recommend sticking with well-established, popular optimizers, especially
-    when starting a new project.
-    -   Ideally, choose the most popular optimizer used for the same type of
-        problem.
--   Be prepared to give attention to **\*****all****\*** hyperparameters of the
-    chosen optimizer.
-    -   Optimizers with more hyperparameters may require more tuning effort to
-        find the best configuration.
-    -   This is particularly relevant in the beginning stages of a project when
-        we are trying to find the best values of various other hyperparameters
-        (e.g. architecture hyperparameters) while treating optimizer
-        hyperparameters as
-        [nuisance parameters](#identifying-scientific-nuisance-and-fixed-hyperparameters).
-    -   It may be preferable to start with a simpler optimizer (e.g. SGD with
-        fixed momentum or Adam with fixed $\epsilon$, $\beta_{1}$, and
-        $\beta_{2}$) in the initial stages of the project and switch to a more
-        general optimizer later.
--   Well-established optimizers that we like include (but are not limited to):
-    -   [SGD with momentum](#what-are-the-update-rules-for-all-the-popular-optimization-algorithms)
-        (we like the Nesterov variant)
-    -   [Adam and NAdam](#what-are-the-update-rules-for-all-the-popular-optimization-algorithms),
-        which are more general than SGD with momentum. Note that Adam has 4
-        tunable hyperparameters
-        [and they can all matter](https://arxiv.org/abs/1910.05446)!
-        -   See
-            [How should Adam's hyperparameters be tuned?](#how-should-adams-hyperparameters-be-tuned)
+-   我们推荐使用成熟的、广泛使用的优化器，尤其是在开始一个新项目的时候。
+    -   理想情况下，选择用于相同类型问题下的最广泛使用的优化器。
+-   注意关注所选择优化器的***所有***超参数。
+    -   具有更多超参数的优化器可能需要更多的调参经历来找到最佳配置。
+    -   这点很重要，尤其是在项目的开始阶段我们可能，而忽略了优化器的超参数，把它看成了无用且讨厌的参数（[nuisance parameters](#identifying-scientific-nuisance-and-fixed-hyperparameters)）。
+    -   在项目的初始夹断，最好是从一个简单的优化器开始，比如使用固定动量的SGD或固定 $\epsilon$、 $\beta_{1}$、$\beta_{2}$的Adam。然后再切换到更通用的优化器。
+-   我们喜欢的成熟的优化器包括（但不限于）以下：
+    -   [带动量的SGD](#what-are-the-update-rules-for-all-the-popular-optimization-algorithms)
+        (我们喜欢 Nesterov变种的。)
+    -   [Adam 和NAdam](#what-are-the-update-rules-for-all-the-popular-optimization-algorithms),
+        它们比带动量的SGD更通用。请注意，Adam有四个可调的超参数，而且[它们都很重要](https://arxiv.org/abs/1910.05446)！
+        -   可看
+            [Adam的超参数应该如何调整？](#Adam的超参数应该如何调整？)
 
-### Choosing the batch size
+### 选择batchsize
 
-***Summary:*** *The batch size governs the training speed and shouldn't be used
-to directly tune the validation set performance. Often, the ideal batch size
-will be the largest batch size supported by the available hardware.*
+***摘要:*** *batch size 影响训练速度，不应用于直接调整验证集的性能。通常，理想的batch size是硬件所能达到的最大的batch size。*
 
--   The batch size is a key factor in determining the *training time* and
-    *computing resource consumption*.
--   Increasing the batch size will often reduce the training time. This can be
-    highly beneficial because it, e.g.:
-    -   Allows hyperparameters to be tuned more thoroughly within a fixed time
-        interval, potentially resulting in a better final model.
-    -   Reduces the latency of the development cycle, allowing new ideas to be
-        tested more frequently.
--   Increasing the batch size may either decrease, increase, or not change the
-    resource consumption.
--   The batch size should *not be* treated as a tunable hyperparameter for
-    validation set performance.
-    -   As long as all hyperparameters are well-tuned (especially the learning
-        rate and regularization hyperparameters) and the number of training
-        steps is sufficient, the same final performance should be attainable
-        using any batch size (see
+-   batch size 是确定训练时间和计算资源消耗的关键因素。
+-   增加batch size的大小通常会减少训练时间。 这可能是非常有益的，因为它，例如：
+    -   允许在固定时间间隔内更彻底地调整超参数，从而可能导致更好的最终模型。
+    -   减少开发周期的延迟，从而更频繁地测试新想法。
+-   增加batch size大小可能会减少，增加或不改变资源消耗。
+-   batch size不应被视为针对验证集性能的超参数。
+    -   只要所有超参数都经过了良好的调参(特别是学习率和正则化的参数)，并且训练步骤足够多，那么使用任何batch size大小都应该能够获得相同的最终性能 (见
         [Shallue et al. 2018](https://arxiv.org/abs/1811.03600)).
-    -   Please see [Why shouldn't the batch size be tuned to directly improve
+    -   请见 [Why shouldn't the batch size be tuned to directly improve
         validation set
         performance?](#why-shouldnt-the-batch-size-be-tuned-to-directly-improve-validation-set-performance)
 
-#### Determining the feasible batch sizes and estimating training throughput
+#### 确定可行的batchsize大小和估计训练的吞吐量
 
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
--   For a given model and optimizer, there will typically be a range of batch
-    sizes supported by the available hardware. The limiting factor is usually
-    accelerator memory.
--   Unfortunately, it can be difficult to calculate which batch sizes will fit
-    in memory without running, or at least compiling, the full training program.
--   The easiest solution is usually to run training jobs at different batch
-    sizes (e.g. increasing powers of 2) for a small number of steps until one of
-    the jobs exceeds the available memory.
--   For each batch size, we should train for long enough to get a reliable
-    estimate of the *training throughput*
+-   对于给定的模型和优化器，可用硬件通常会支持一定范围的批处理大小。限制因素通常是GPU等加速器的内存（accelerator memory）。
+-   不幸的是，如果不运行或至少编译完整的训练程序，就很难计算出哪些批处理大小适合内存。
+-   最简单的解决方案通常是以不同的批处理大小(例如增加2的幂)运行少量步骤的训练作业（ job），直到其中一个作业超过可用内存。
+-   对于每个批次大小，我们应该训练足够长的时间，以获得*训练吞吐量（training throughput）*的可靠估计。
 
 <p align="center">training throughput = (# examples processed per second)</p>
 
-<p align="center">or, equivalently, the <em>time per step</em>.</p>
+<p align="center">或者,同样的, the <em>time per step</em>.</p>
 
 <p align="center">time per step = (batch size) / (training throughput)</p>
 
--   When the accelerators aren't yet saturated, if the batch size doubles, the
-    training throughput should also double (or at least nearly double).
-    Equivalently, the time per step should be constant (or at least nearly
-    constant) as the batch size increases.
--   If this is not the case then the training pipeline has a bottleneck such as
-    I/O or synchronization between compute nodes. This may be worth diagnosing
-    and correcting before proceeding.
--   If the training throughput increases only up to some maximum batch size,
-    then we should only consider batch sizes up to that maximum batch size, even
-    if a larger batch size is supported by the hardware.
-    -   All benefits of using a larger batch size assume the training throughput
-        increases. If it doesn't, fix the bottleneck or use the smaller batch
-        size.
-    -   **Gradient accumulation** simulates a larger batch size than the
-        hardware can support and therefore does not provide any throughput
-        benefits. It should generally be avoided in applied work.
--   These steps may need to be repeated every time the model or optimizer is
-    changed (e.g. a different model architecture may allow a larger batch size
-    to fit in memory).
+-   当加速器尚未饱和时，如果batch size翻倍，训练的吞吐量也应该翻倍(或至少接近翻倍)。
+    同样的, 随着batch size 增加，the time per step 是恒定的 (或几乎恒定) 
+-   如果不是这种情况，那么训练pipeline就会出现瓶颈，比如计算节点之间的I/O或同步。在继续之前，这可能值得诊断和纠正。
+-   如果训练吞吐量只增加到某个最大的batch size，那么我们应该只考虑最大的batch size，即，使硬件支持更大的batch size。
+    -   使用更大的batch size的所有好处都假定训练吞吐量增加。如果不能，修复瓶颈或使用较小的batch size。
+    -   **梯度累加（Gradient accumulation）** 是一种不需要额外硬件资源就可以增加batch size的训练技巧，能模拟出大于硬件所能支持的batch size。它不提供任何吞吐量优势。在实际工作中一般应避免使用。
+-   这些步骤可能需要在每次模型或优化器更改时重复执行(例如，不同的模型架构可能允许更大的batch size)..
 
 </details>
 
-#### Choosing the batch size to minimize training time
+#### 选择batch size来最小化训练时间
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -309,7 +209,8 @@ will be the largest batch size supported by the available hardware.*
 
 #### Choosing the batch size to minimize resource consumption
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -357,7 +258,8 @@ will be the largest batch size supported by the available hardware.*
 
 #### Changing the batch size requires re-tuning most hyperparameters
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -375,7 +277,8 @@ will be the largest batch size supported by the available hardware.*
 
 #### How batch norm interacts with the batch size
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -387,7 +290,7 @@ will be the largest batch size supported by the available hardware.*
 
 </details>
 
-### Choosing the initial configuration
+### 选择初始配置
 
 -   Before beginning hyperparameter tuning we must determine the starting point.
     This includes specifying (1) the model configuration (e.g. number of
@@ -439,7 +342,7 @@ Our guidance below makes the following assumptions:
 
 ### The incremental tuning strategy
 
-***Summary:*** *Start with a simple configuration and incrementally make
+***摘要:*** *Start with a simple configuration and incrementally make
 improvements while building up insight into the problem. Make sure that any
 improvement is based on strong evidence to avoid adding unnecessary complexity.*
 
@@ -484,7 +387,7 @@ detail.
 
 ### Exploration vs exploitation
 
-***Summary:*** *Most of the time, our primary goal is to gain insight into the
+***摘要:*** *Most of the time, our primary goal is to gain insight into the
 problem.*
 
 -   Although one might think we would spend most of our time trying to maximize
@@ -516,7 +419,7 @@ problem.*
 
 ### Choosing the goal for the next round of experiments
 
-***Summary:*** *Each round of experiments should have a clear goal and be
+***摘要:*** *Each round of experiments should have a clear goal and be
 sufficiently narrow in scope that the experiments can actually make progress
 towards the goal.*
 
@@ -533,7 +436,7 @@ towards the goal.*
 
 ### Designing the next round of experiments
 
-***Summary:*** *Identify which hyperparameters are scientific, nuisance, and
+***摘要:*** *Identify which hyperparameters are scientific, nuisance, and
 fixed hyperparameters for the experimental goal. Create a sequence of studies to
 compare different values of the scientific hyperparameters while optimizing over
 the nuisance hyperparameters. Choose the search space of nuisance
@@ -541,7 +444,8 @@ hyperparameters to balance resource costs with scientific value.*
 
 #### Identifying scientific, nuisance, and fixed hyperparameters
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -689,7 +593,8 @@ hyperparameters to balance resource costs with scientific value.*
 
 #### Creating a set of studies
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -752,7 +657,8 @@ hyperparameters to balance resource costs with scientific value.*
 
 #### Striking a balance between informative and affordable experiments
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -799,7 +705,7 @@ hyperparameters to balance resource costs with scientific value.*
 
 ### Extracting insight from experimental results
 
-***Summary:*** *In addition to trying to achieve the original scientific goal of
+***摘要:*** *In addition to trying to achieve the original scientific goal of
 each group of experiments, go through a checklist of additional questions and,
 if issues are discovered, revise the experiments and rerun them.*
 
@@ -843,7 +749,8 @@ if issues are discovered, revise the experiments and rerun them.*
 
 #### Identifying bad search space boundaries
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -862,6 +769,7 @@ if issues are discovered, revise the experiments and rerun them.*
 <img src="assets/bad_search_space.png" width="49%" alt="Example of bad search space boundaries">
 <img src="assets/good_search_space.png" width="49%" alt="Example of good search space boundaries">
 </p>
+
 
 <p align="center"><b>Figure 1:</b> Examples of bad search space boundaries and acceptable search space boundaries.</p>
 
@@ -882,7 +790,8 @@ if issues are discovered, revise the experiments and rerun them.*
 
 #### Not sampling enough points in the search space
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -900,12 +809,13 @@ if issues are discovered, revise the experiments and rerun them.*
 
 #### Examining the training curves
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
 
-***Summary:*** *Examining the training curves is an easy way to identify common
+***摘要:*** *Examining the training curves is an easy way to identify common
 failure modes and can help us prioritize what actions to take next.*
 
 -   Although in many cases the primary objective of our experiments only
@@ -995,7 +905,8 @@ failure modes and can help us prioritize what actions to take next.*
 
 #### Detecting whether a change is useful with isolation plots
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -1004,6 +915,7 @@ failure modes and can help us prioritize what actions to take next.*
 <img src="assets/isolation_plot.png" width="49%" alt="Isolation plot that investigates the best value of weight decay for ResNet-50
 trained on ImageNet.">
 </p>
+
 
 <p align="center"><b>Figure 2:</b> Isolation plot that investigates the best value of weight decay for ResNet-50 trained on ImageNet.</p>
 
@@ -1035,7 +947,8 @@ trained on ImageNet.">
 
 #### Automate generically useful plots
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -1056,7 +969,7 @@ trained on ImageNet.">
 
 ### Determining whether to adopt a training pipeline change or hyperparameter configuration
 
-***Summary:*** *When deciding whether to make a change to our model or training
+***摘要:*** *When deciding whether to make a change to our model or training
 procedure or adopt a new hyperparameter configuration going forward, we need to
 be aware of the different sources of variation in our results.*
 
@@ -1110,7 +1023,7 @@ be aware of the different sources of variation in our results.*
 
 ### After exploration concludes
 
-***Summary:*** *Bayesian optimization tools are a compelling option once we’re
+***摘要:*** *Bayesian optimization tools are a compelling option once we’re
 done exploring for good search spaces and have decided what hyperparameters even
 should be tuned at all.*
 
@@ -1223,7 +1136,8 @@ should be tuned at all.*
 
 #### Algorithm for picking an initial candidate for max_train_steps using a learning rate sweep
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -1285,7 +1199,8 @@ should be tuned at all.*
 
 #### Round 1
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -1334,7 +1249,8 @@ should be tuned at all.*
 
 #### Round 2
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -1365,7 +1281,7 @@ should be tuned at all.*
 
 ### Optimizing the input pipeline
 
-***Summary:*** *The causes and interventions of input-bound pipelines are highly
+***摘要:*** *The causes and interventions of input-bound pipelines are highly
 task-dependent; use a profiler and look out for common issues.*
 
 -   Use an appropriate profiler to diagnose input-bound pipelines. For example,
@@ -1395,12 +1311,13 @@ task-dependent; use a profiler and look out for common issues.*
 
 ### Evaluating model performance
 
-***Summary:*** *Run evaluation at larger batch sizes than training. Run
+***摘要:*** *Run evaluation at larger batch sizes than training. Run
 evaluations at regular step intervals, not regular time intervals.*
 
 #### Evaluation settings
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -1428,7 +1345,8 @@ evaluations at regular step intervals, not regular time intervals.*
 
 #### Setting up periodic evaluations
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -1469,7 +1387,8 @@ evaluations at regular step intervals, not regular time intervals.*
 
 #### Choosing a sample for periodic evaluation
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -1503,7 +1422,7 @@ evaluations at regular step intervals, not regular time intervals.*
 
 ### Saving checkpoints and retrospectively selecting the best checkpoint
 
-***Summary:*** *Run training for a fixed number of steps and retrospectively
+***摘要:*** *Run training for a fixed number of steps and retrospectively
 choose the best checkpoint from the run.*
 
 -   Most deep learning frameworks support
@@ -1524,7 +1443,7 @@ choose the best checkpoint from the run.*
 
 ### Setting up experiment tracking
 
-***Summary:*** *When tracking different experiments, make sure to note a number
+***摘要:*** *When tracking different experiments, make sure to note a number
 of essentials like the best performance of a checkpoint in the study, and a
 short description of the study.*
 
@@ -1544,7 +1463,7 @@ short description of the study.*
 
 ### Batch normalization implementation details
 
-***Summary:*** *Nowadays batch norm can often be replaced with LayerNorm, but in
+***摘要:*** *Nowadays batch norm can often be replaced with LayerNorm, but in
 cases where it cannot, there are tricky details when changing the batch size or
 number of hosts.*
 
@@ -1568,7 +1487,7 @@ number of hosts.*
 
 ### Considerations for multi-host pipelines
 
-***Summary:*** *for logging, evals, RNGs, checkpointing, and data sharding,
+***摘要:*** *for logging, evals, RNGs, checkpointing, and data sharding,
 multi-host training can make it very easy to introduce bugs!*
 
 -   Ensure the pipeline is only logging and checkpointing on one host.
@@ -1580,11 +1499,12 @@ multi-host training can make it very easy to introduce bugs!*
 -   Sharding data files across hosts is usually recommended for improved
     performance.
 
-## FAQs
+## 常见问题解答
 
 ### What is the best learning rate decay schedule family?
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 <br>
 
@@ -1600,8 +1520,9 @@ multi-host training can make it very easy to introduce bugs!*
 
 ### Which learning rate decay should I use as a default?
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
 <br>
+
 
 -   Our preference is either linear decay or cosine decay, and a bunch of other
     schedule families are probably good too.
@@ -1610,8 +1531,9 @@ multi-host training can make it very easy to introduce bugs!*
 
 ### Why do some papers have complicated learning rate schedules?
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
 <br>
+
 
 -   It’s not uncommon to see papers with complicated piecewise learning rate
     (LR) decay schedules.
@@ -1640,8 +1562,9 @@ multi-host training can make it very easy to introduce bugs!*
 
 ### How should Adam’s hyperparameters be tuned?
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
 <br>
+
 
 -   As discussed above, making general statements about search spaces and how
     many points one should sample from the search space is very difficult. Note
@@ -1658,7 +1581,8 @@ multi-host training can make it very easy to introduce bugs!*
 
 ### Why use quasi-random search instead of more sophisticated black box optimization algorithms during the exploration phase of tuning?
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
+
 
 -   Quasi-random search (based on
     [low-discrepancy sequences](https://en.wikipedia.org/wiki/Low-discrepancy_sequence))
@@ -1733,6 +1657,7 @@ multi-host training can make it very easy to introduce bugs!*
     results harder to interpret.
 
 [^3]: Ben Recht and Kevin Jamieson
+
     [pointed out](http://www.argmin.net/2016/06/20/hypertuning/) how strong
     2X-budget random search is as a baseline (the
     [Hyperband paper](https://jmlr.org/papers/volume18/16-558/16-558.pdf)
@@ -1747,8 +1672,9 @@ multi-host training can make it very easy to introduce bugs!*
 
 ### Where can I find an implementation of quasi-random search?
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
 <br>
+
 
 -   We use
     [this implementation](https://github.com/mlcommons/algorithmic-efficiency/blob/main/algorithmic_efficiency/halton.py)
@@ -1766,16 +1692,19 @@ multi-host training can make it very easy to introduce bugs!*
 
 ### How many trials are needed to get good results with quasi-random search?
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
 <br>
+
 
 <p align="center">
 <img src="assets/have_we_sampled_enough.png" width="49%" alt="A box plot showing the importance of sampling enough">
 </p>
 
+
 <p align="center"><b>Figure 3:</b> A ResNet-50 was tuned on ImageNet with 100
 trials. Via bootstrapping, different amounts of tuning budget were simulated.
 Box plots of the best performances for each trial budget are plotted above.
+
 
 -   There is no way to answer this question in general, but we can look at
     specific examples.
@@ -1793,17 +1722,19 @@ Box plots of the best performances for each trial budget are plotted above.
 
 ### How can optimization failures be debugged and mitigated?
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
 <br>
 
 
-***Summary:*** *If the model is experiencing optimization difficulties, it’s
+
+***摘要:*** *If the model is experiencing optimization difficulties, it’s
 important to fix them before trying other things. Diagnosing and correcting
 training failures is an active area of research.*
 
 <p align="center">
 <img src="assets/stride_instability.png" width="80%" alt="Changing the strides in a single residual block in a WideResnet results in training instability.">
 </p>
+
 
 
 <p align="center"><b>Figure 4:</b> Changing the strides in a single residual block (2x2 -> 1x1) in a WideResnet results in training instability. This does not degrade performance at low learning rates, but high learning rates no longer train well due to the instability. Applying 1000 steps of learning rate warmup resolves this particular instance of instability, allowing stable training at max learning rate of .1.</p>
@@ -1839,6 +1770,7 @@ To check for this, we can train for an abbreviated run of just \~500 steps using
 training.">
 </p>
 
+
 <p align="center"><b>Figure 5:</b> Illustration of the value of more frequent evaluations at the start of training. Useful if there’s a suspicion that the model suffers from early training instability.</p>
 
 #### Potential fixes for common instability patterns
@@ -1870,6 +1802,7 @@ training.">
 scale).">
 </p>
 
+
 <p align="center"><b>Figure 6:</b> An example of instability during a warmup period (note the horizontal axis log scale). 40k steps of warmup was needed for successful training in this case.</p>
 
 ##### When to apply learning rate warmup
@@ -1878,11 +1811,13 @@ scale).">
 <img src="assets/axis_model_with_instability.png" width="49%" alt="Axis plot for model with instability">
 </p>
 
+
 <p align="center"><b>Figure 7a:</b> An example of a hyperparameter axis plot for a model exhibiting training instability. The best learning rate is at the edge of what is feasible. An "infeasible" trial is defined as one that either produces NaNs or uncharacteristically high values of the loss.</p>
 
 <p align="center">
 <img src="assets/loss_model_with_instability.png" width="49%" alt="Loss curve for model with instability">
 </p>
+
 
 <p align="center"><b>Figure 7b:</b> The training loss of a model trained with a learning rate where we see instability.</p>
 
@@ -1900,6 +1835,7 @@ scale).">
 <p align="center">
 <img src="assets/beneficial_effect_warmup.png" width="80%" alt="Beneficial effect of warmup on training instabilities">
 </p>
+
 
 <p align="center"><b>Figure 8:</b> Beneficial effect of learning rate warmup on addressing training instabilities.</p>
 
@@ -1946,6 +1882,7 @@ scale).">
 <img src="assets/gradient_clipping.png" width="80%" alt="Gradient clipping on early training instabilities">
 </p>
 
+
 <p align="center"><b>Figure 9:</b> Illustration of gradient clipping correcting early training instability.</p>
 
 -   Gradient clipping is most useful when large or outlier gradient issues
@@ -1981,8 +1918,9 @@ scale).">
 
 ### Why do you call the learning rate and other optimization parameters hyperparameters? They are not parameters of any prior distribution.
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
 <br>
+
 
 -   It is true that the term "hyperparameter" has a precise
     [meaning](https://en.wikipedia.org/wiki/Hyperparameter) in Bayesian machine
@@ -2008,23 +1946,24 @@ scale).">
 
 ### Why shouldn't the batch size be tuned to directly improve validation set performance?
 
-<details><summary><em>[Click to expand]</em></summary>
+<details><summary><em>[点击展开]</em></summary>
 <br>
+
 
 -   Changing the batch size *without changing any other details of the training pipeline* will often affect the validation set performance.
 -   However, the difference in validation set performance between two batch sizes typically goes away if the training pipeline is optimized independently for each batch size.
 -   The hyperparameters that interact most strongly with the batch size, and therefore are most important to tune separately for each batch size, are the optimizer hyperparameters (e.g. learning rate, momentum) and the regularization hyperparameters.
     - Smaller batch sizes introduce more noise into the training algorithm due to sample variance, and this noise can have a regularizing effect. Thus, larger batch sizes can be more prone to overfitting and may require stronger regularization and/or additional regularization techniques.
-- In addition, [the number of training steps may need to be adjusted](#choosing-the-batch-size-to-minimize-training-time) when changing the batch size.
+-   In addition, [the number of training steps may need to be adjusted](#choosing-the-batch-size-to-minimize-training-time) when changing the batch size.
 -   Once all these effects are taken into account, there is currently no convincing evidence that the batch size affects the maximum achievable validation performance (see [Shallue et al. 2018](https://arxiv.org/abs/1811.03600)).
 
 </details>
 
-### What are the update rules for all the popular optimization algorithms?
+### 所有流行的优化算法的更新规则是什么？
 
-<details><summary><em>[Click to expand]</em></summary>
-
+<details><summary><em>[点击展开]</em></summary>
 <br>
+
 
 #### Stochastic gradient descent (SGD)
 
@@ -2082,17 +2021,14 @@ $$\theta_{t+1} = \theta_{t} - \alpha_t \frac{\beta_1 m_{t+1} + (1 - \beta_1) \na
 
 </details>
 
-## Acknowledgments
+## 致谢
 
--   We owe a debt of gratitude to Max Bileschi, Roy Frostig, Zelda Mariet, Stan
-    Bileschi, Mohammad Norouzi, Chris DuBois and Charles Sutton for reading the
-    manuscript and providing valuable feedback.
--   We reused some experimental data for several plots that were originally
-    produced by Naman Agarwal for other joint research.
--   We would like to thank Will Chen for invaluable advice on the presentation of the document.
--   We would also like to thank Rohan Anil for useful discussions.
+-   我们要感谢Max Bileschi，Roy Frostig，Zelda Mariet，Stan Bileschi，Mohammad Norouzi，Chris Dubois和Charles Sutton阅读了手稿并提供了宝贵的反馈。
+-   我们使用了了一些最初由Naman Agarwal生产的其他联合研究机构的实验数据。
+-   我们要感谢Will Chen在文档的介绍中的宝贵建议。
+-   我们还要感谢Rohan Anil的有帮助的讨论。
 
-## Citing
+## 引用
 
 ```
 @misc{tuningplaybookgithub,
@@ -2104,7 +2040,7 @@ $$\theta_{t+1} = \theta_{t} - \alpha_t \frac{\beta_1 m_{t+1} + (1 - \beta_1) \na
 }
 ```
 
-## Contributing
+## 贡献
 
 -   This is not an officially supported Google product.
 
@@ -2124,7 +2060,7 @@ $$\theta_{t+1} = \theta_{t} - \alpha_t \frac{\beta_1 m_{t+1} + (1 - \beta_1) \na
 -   Please don't file a pull request without first coordinating with the authors
     via the issue tracking system.
 
-### Contributor License Agreement
+### 贡献者许可协议
 
 Contributions to this project must be accompanied by a Contributor License
 Agreement (CLA). You (or your employer) retain the copyright to your
